@@ -1,0 +1,50 @@
+                            | # Execution begins at address 0
+0x000:                      |     .pos 0
+0x000: 30f40002000000000000 |     irmovq stack, %rsp
+0x00a: 30f80800000000000000 |     irmovq $8, %r8
+0x014: 805000000000000000   |     call main
+0x01d: 00                   |     halt
+                            | 
+                            | # Sample data
+0x020:                      | .align 8
+                            | # Source block
+0x020:                      | src:
+0x020: 0a00000000000000     |     .quad 0x00a
+0x028: b000000000000000     |     .quad 0x0b0
+0x030: 000c000000000000     |     .quad 0xc00
+                            | # Destination block
+0x038:                      | dest:
+0x038: 1101000000000000     |     .quad 0x111
+0x040: 2202000000000000     |     .quad 0x222
+0x048: 3303000000000000     |     .quad 0x333
+                            | 
+0x050:                      | main:
+0x050: 30f72000000000000000 |     irmovq src, %rdi
+0x05a: 30f63800000000000000 |     irmovq dest, %rsi
+0x064: 30f20300000000000000 |     irmovq $3, %rdx
+0x06e: 807800000000000000   |     call copy_block
+0x077: 90                   |     ret
+                            | 
+                            | # long copy_block(long *src, long *dest, long len)
+                            | # *src in %rdi, *dest in %rsi, len in %rdx
+0x078:                      | copy_block:
+0x078: 30f00000000000000000 |     irmovq $0, %rax
+0x082: 6222                 |     andq %rdx, %rdx
+0x084: 70b300000000000000   |     jmp test
+                            | 
+0x08d:                      | loop:
+0x08d: 50a70000000000000000 |     mrmovq (%rdi), %r10
+0x097: 40a60000000000000000 |     rmmovq %r10, (%rsi)
+0x0a1: 63a0                 |     xorq %r10, %rax
+0x0a3: 6087                 |     addq %r8, %rdi
+0x0a5: 6086                 |     addq %r8, %rsi
+0x0a7: 30fa0100000000000000 |     irmovq $1, %r10
+0x0b1: 61a2                 |     subq %r10, %rdx
+                            | 
+0x0b3:                      | test:
+0x0b3: 768d00000000000000   |     jg loop
+0x0bc: 90                   |     ret
+                            | 
+                            | # Static starts here and grows to lower addresses
+0x200:                      |     .pos 0x200
+0x200:                      | stack:
