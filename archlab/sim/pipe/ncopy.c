@@ -15,11 +15,11 @@ word_t ncopy(word_t *src, word_t *dst, word_t len)
     word_t val;
 
     while (len > 0) {
-	val = *src++;
-	*dst++ = val;
-	if (val > 0)
-	    count++;
-	len--;
+        val = *src++;
+        *dst++ = val;
+        if (val > 0)
+            count++;
+        len--;
     }
     return count;
 }

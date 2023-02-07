@@ -30,22 +30,113 @@ ncopy:
 # You can modify this portion
 	# Loop header
 	xorq %rax,%rax		# count = 0;
-	andq %rdx,%rdx		# len <= 0?
-	jle Done		# if so, goto Done:
 
-Loop:	mrmovq (%rdi), %r10	# read val from src...
-	rmmovq %r10, (%rsi)	# ...and store it to dst
-	andq %r10, %r10		# val <= 0?
-	jle Npos		# if so, goto Npos:
-	irmovq $1, %r10
-	addq %r10, %rax		# count++
-Npos:	irmovq $1, %r10
-	subq %r10, %rdx		# len--
-	irmovq $8, %r10
-	addq %r10, %rdi		# src++
-	addq %r10, %rsi		# dst++
-	andq %rdx,%rdx		# len > 0?
-	jg Loop			# if so, goto Loop:
+# while 1
+	rrmovq %rdx, %r14
+	iaddq $-6, %r14     # len < 6
+	jl Done1            # if so, goto Done1
+Loop1:
+	mrmovq (%rdi), %r10
+	rmmovq %r10, (%rsi) # src -> dst
+	mrmovq 8(%rdi), %r11
+	rmmovq %r11, 8(%rsi) # src -> dst
+	mrmovq 16(%rdi), %r12
+	rmmovq %r12, 16(%rsi) # src -> dst
+	mrmovq 24(%rdi), %r13
+	rmmovq %r13, 24(%rsi) # src -> dst
+	mrmovq 32(%rdi), %r8
+	rmmovq %r8, 32(%rsi) # src -> dst
+	mrmovq 40(%rdi), %r9
+	rmmovq %r9, 40(%rsi) # src -> dst
+
+	iaddq $48, %rdi     # src += 6
+	iaddq $48, %rsi     # dst += 6
+
+	andq %r10, %r10		# val1 <= 0?
+	jle AddCount1		# if so, goto AddCount1
+	iaddq $1, %rax		# count++
+AddCount1:
+	andq %r11, %r11		# val2 <= 0?
+	jle AddCount2		# if so, goto AddCount2
+	iaddq $1, %rax		# count++
+AddCount2:
+	andq %r12, %r12		# val3 <= 0?
+	jle AddCount3		# if so, goto AddCount3
+	iaddq $1, %rax		# count++
+AddCount3:
+	andq %r13, %r13		# val4 <= 0?
+	jle AddCount4		# if so, goto AddCount4
+	iaddq $1, %rax		# count++
+AddCount4:
+	andq %r8, %r8		# val5 <= 0?
+	jle AddCount5		# if so, goto AddCount5
+	iaddq $1, %rax		# count++
+AddCount5:
+	andq %r9, %r9		# val6 <= 0?
+	jle AddCount6		# if so, goto AddCount6
+	iaddq $1, %rax		# count++
+AddCount6:
+
+	iaddq $-6, %rdx     # len -= 6
+	rrmovq %rdx, %r14
+	iaddq $-6, %r14     # len >= 6
+	jge Loop1 			# if so, goto Loop1
+Done1:
+
+# while 2
+	rrmovq %rdx, %r14
+	iaddq $-3, %r14     # len < 3
+	jl Done2            # if so, goto Done1
+Loop2:
+	mrmovq (%rdi), %r10
+	rmmovq %r10, (%rsi) # src -> dst
+	mrmovq 8(%rdi), %r11
+	rmmovq %r11, 8(%rsi) # src -> dst
+	mrmovq 16(%rdi), %r12
+	rmmovq %r12, 16(%rsi) # src -> dst
+
+	iaddq $24, %rdi     # src += 3
+	iaddq $24, %rsi     # dst += 3
+
+	andq %r10, %r10		# val1 <= 0?
+	jle AddCount1s		# if so, goto AddCount1s
+	iaddq $1, %rax		# count++
+AddCount1s:
+	andq %r11, %r11		# val2 <= 0?
+	jle AddCount2s		# if so, goto AddCount2s
+	iaddq $1, %rax		# count++
+AddCount2s:
+	andq %r12, %r12		# val3 <= 0?
+	jle AddCount3s		# if so, goto AddCount3s
+	iaddq $1, %rax		# count++
+AddCount3s:
+
+	iaddq $-3, %rdx     # len -= 3
+	rrmovq %rdx, %r14
+	iaddq $-3, %r14     # len >= 3
+	jge Loop2 			# if so, goto Loop1
+Done2:
+
+# Last 3 elements
+	andq %rdx,%rdx		# len == 0
+	je Done				# if so, goto Done:
+	iaddq $-1, %rdx     # len == 1
+	je case1
+	mrmovq 8(%rdi), %r10
+	rmmovq %r10, 8(%rsi) # src -> dst
+	andq %r10, %r10		# val1 <= 0?
+	jle AddCount1t		# if so, goto AddCount1t
+	iaddq $1, %rax		# count++
+AddCount1t:
+case1:
+	mrmovq (%rdi), %r10
+	rmmovq %r11, (%rsi) # src -> dst
+	andq %r11, %r11		# val2 <= 0?
+	jle AddCount2t		# if so, goto AddCount2t
+	iaddq $1, %rax		# count++
+AddCount2t:
+
+
 ##################################################################
 # Do not modify the following section of code
 # Function epilogue.
@@ -63,8 +154,8 @@ EndFun:
 	.align 8
 src:
 	.quad 1
-	.quad -2
-	.quad 3
+	.quad 2
+	.quad -3
 	.quad -4
 	.quad 0xbcdefa # This shouldn't get moved
 

@@ -17,22 +17,132 @@ ncopy:
 # You can modify this portion
 	# Loop header
 	xorq %rax,%rax		# count = 0;
-	andq %rdx,%rdx		# len <= 0?
-	jle Done		# if so, goto Done:
 
-Loop:	mrmovq (%rdi), %r10	# read val from src...
-	rmmovq %r10, (%rsi)	# ...and store it to dst
-	andq %r10, %r10		# val <= 0?
-	jle Npos		# if so, goto Npos:
-	irmovq $1, %r10
-	addq %r10, %rax		# count++
-Npos:	irmovq $1, %r10
-	subq %r10, %rdx		# len--
-	irmovq $8, %r10
-	addq %r10, %rdi		# src++
-	addq %r10, %rsi		# dst++
-	andq %rdx,%rdx		# len > 0?
-	jg Loop			# if so, goto Loop:
+# while 1
+	rrmovq %rdx, %r14
+	iaddq $-8, %r14     # len < 8
+	jl Done1            # if so, goto Done1
+Loop1:
+	mrmovq (%rdi), %r10
+	rrmovq %rax, %r14
+	iaddq $1, %r14
+	andq %r10, %r10		# val1 > 0
+	cmovg %r14, %rax	# count++
+	rmmovq %r10, (%rsi) # src -> dst
+
+	mrmovq 8(%rdi), %r11
+	rrmovq %rax, %r14
+	iaddq $1, %r14
+	andq %r11, %r11		# val1 > 0
+	cmovg %r14, %rax	# count++
+	rmmovq %r11, 8(%rsi) # src -> dst
+
+	mrmovq 16(%rdi), %r12
+	rrmovq %rax, %r14
+	iaddq $1, %r14
+	andq %r12, %r12		# val1 > 0
+	cmovg %r14, %rax	# count++
+	rmmovq %r12, 16(%rsi) # src -> dst
+
+	mrmovq 24(%rdi), %r13
+	rrmovq %rax, %r14
+	iaddq $1, %r14
+	andq %r13, %r13		# val1 > 0
+	cmovg %r14, %rax	# count++
+	rmmovq %r13, 24(%rsi) # src -> dst
+
+	mrmovq 32(%rdi), %r8
+	rrmovq %rax, %r14
+	iaddq $1, %r14
+	andq %r8, %r8		# val1 > 0
+	cmovg %r14, %rax	# count++
+	rmmovq %r8, 32(%rsi) # src -> dst
+
+	mrmovq 40(%rdi), %r9
+	rrmovq %rax, %r14
+	iaddq $1, %r14
+	andq %r9, %r9		# val1 > 0
+	cmovg %r14, %rax	# count++
+	rmmovq %r9, 40(%rsi) # src -> dst
+
+	mrmovq 48(%rdi), %rbx
+	rrmovq %rax, %r14
+	iaddq $1, %r14
+	andq %rbx, %rbx		# val1 > 0
+	cmovg %r14, %rax	# count++
+	rmmovq %rbx, 48(%rsi) # src -> dst
+
+	mrmovq 56(%rdi), %rcx
+	rrmovq %rax, %r14
+	iaddq $1, %r14
+	andq %rcx, %rcx		# val1 > 0
+	cmovg %r14, %rax	# count++
+	rmmovq %rcx, 56(%rsi) # src -> dst
+
+	iaddq $64, %rdi     # src += 8
+	iaddq $64, %rsi     # dst += 8
+
+	iaddq $-8, %rdx     # len -= 8
+	rrmovq %rdx, %r14
+	iaddq $-8, %r14     # len >= 8
+	jge Loop1 			# if so, goto Loop1
+Done1:
+
+# while 2
+	rrmovq %rdx, %r14
+	iaddq $-3, %r14     # len < 3
+	jl Done2            # if so, goto Done1
+Loop2:
+	mrmovq (%rdi), %r10
+	rrmovq %rax, %r14
+	iaddq $1, %r14
+	andq %r10, %r10		# val1 > 0
+	cmovg %r14, %rax	# count++
+	rmmovq %r10, (%rsi) # src -> dst
+
+	mrmovq 8(%rdi), %r11
+	rrmovq %rax, %r14
+	iaddq $1, %r14
+	andq %r11, %r11		# val1 > 0
+	cmovg %r14, %rax	# count++
+	rmmovq %r11, 8(%rsi) # src -> dst
+
+	mrmovq 16(%rdi), %r12
+	rrmovq %rax, %r14
+	iaddq $1, %r14
+	andq %r12, %r12		# val1 > 0
+	cmovg %r14, %rax	# count++
+	rmmovq %r12, 16(%rsi) # src -> dst
+
+	iaddq $24, %rdi     # src += 3
+	iaddq $24, %rsi     # dst += 3
+
+	iaddq $-3, %rdx     # len -= 3
+	rrmovq %rdx, %r14
+	iaddq $-3, %r14     # len >= 3
+	jge Loop2 			# if so, goto Loop1
+Done2:
+
+# Last 3 elements
+	andq %rdx,%rdx		# len == 0
+	je Done				# if so, goto Done:
+	iaddq $-1, %rdx     # len == 1
+	je case1
+	mrmovq 8(%rdi), %r10
+	rrmovq %rax, %r14
+	iaddq $1, %r14
+	andq %r10, %r10		# val1 > 0
+	cmovg %r14, %rax	# count++
+	rmmovq %r10, 8(%rsi) # src -> dst
+case1:
+	mrmovq (%rdi), %r11
+	rrmovq %rax, %r14
+	iaddq $1, %r14
+	andq %r11, %r11		# val1 > 0
+	cmovg %r14, %rax	# count++
+	rmmovq %r11, (%rsi) # src -> dst
+
+
 ##################################################################
 # Do not modify the following section of code
 # Function epilogue.
