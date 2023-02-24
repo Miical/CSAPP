@@ -1,10 +1,10 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 # nop-server.py - This is a server that we use to create head-of-line
 #                 blocking for the concurrency test. It accepts a
 #                 connection, and then spins forever.
 #
-# usage: nop-server.py <port>                
+# usage: nop-server.py <port>
 #
 import socket
 import sys
