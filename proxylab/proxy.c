@@ -10,11 +10,15 @@
 /* You won't lose style points for including this long line in your code */
 static const char *user_agent_hdr = "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:10.0.3) Gecko/20120305 Firefox/10.0.3\r\n";
 
+int readcnt;
+sem_t mutex, w;
 void doit(int fd);
 void read_requesthdrs(rio_t *rp);
 void parse_uri(char *uri, char *hostname, char *filename, char *port);
 void send_to_server(int fd, char *hostname, char *filename);
-void forward(rio_t *server_rio, int client_fd);
+int send_from_cache(char *uri, int client_fd);
+void insert_into_cache(char* uri, char* data, int len);
+void forward(rio_t *server_rio, int client_fd, char *uri);
 void clienterror(int fd, char *cause, char *errnum,
 		 char *shortmsg, char *longmsg);
 void *thread(void *vargp);
@@ -32,6 +36,8 @@ int main(int argc, char **argv) {
     }
 
     listenfd = Open_listenfd(argv[1]);
+    Sem_init(&mutex, 0, 1);
+    Sem_init(&w, 0, 1);
     while (1) {
         clientlen = sizeof(clientaddr);
         connfdp = Malloc(sizeof(int));
@@ -73,41 +79,15 @@ void doit(int fd) {
     }
     read_requesthdrs(&client_rio);
 
-    /* Parse URI from GET request */
-    parse_uri(uri, hostname, filename, port);
+    if (!send_from_cache(uri, fd)) {
+        parse_uri(uri, hostname, filename, port);
 
-    /* Send to server */
-    int server_fd = Open_clientfd(hostname, port);
-    Rio_readinitb(&server_rio, server_fd);
-    send_to_server(server_fd, hostname, filename);
-    forward(&server_rio, fd);
-    Close(server_fd);
-
-
-    /*
-    if (stat(filename, &sbuf) < 0) {
-        clienterror(fd, filename, "404", "Not found",
-		    "Tiny couldn't find this file");
-        return;
+        int server_fd = Open_clientfd(hostname, port);
+        Rio_readinitb(&server_rio, server_fd);
+        send_to_server(server_fd, hostname, filename);
+        forward(&server_rio, fd, uri);
+        Close(server_fd);
     }
-
-    if (is_static) { // Serve static content
-	if (!(S_ISREG(sbuf.st_mode)) || !(S_IRUSR & sbuf.st_mode)) {
-	    clienterror(fd, filename, "403", "Forbidden",
-			"Tiny couldn't read the file");
-	    return;
-	}
-	serve_static(fd, filename, sbuf.st_size);
-    }
-    else { // Serve dynamic content
-	if (!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)) {
-	    clienterror(fd, filename, "403", "Forbidden",
-			"Tiny couldn't run the CGI program");
-	    return;
-	}
-	serve_dynamic(fd, filename, cgiargs);
-    }
-    */
 }
 
 /*
@@ -129,6 +109,9 @@ void read_requesthdrs(rio_t *rp) {
 
 
 void parse_uri(char *uri, char *hostname, char *filename, char *port) {
+    char uri_copy[MAXLINE];
+    strcpy(uri_copy, uri);
+    uri = uri_copy;
     char *ptr;
     if ((ptr = strstr(uri, "//")) != NULL)
         uri = ptr + 2;
@@ -160,11 +143,18 @@ void send_to_server(int fd, char *hostname, char *filename) {
     Rio_writen(fd, buf, strlen(buf));
 }
 
-void forward(rio_t *server_rio, int client_fd) {
-    char buf[MAXLINE];
+void forward(rio_t *server_rio, int client_fd, char *uri) {
+    char buf[MAXLINE], cache[MAX_OBJECT_SIZE];
+    int sz = 0;
     ssize_t len;
-    while ((len = Rio_readlineb(server_rio, buf, MAXLINE)) != 0)
+    while ((len = Rio_readlineb(server_rio, buf, MAXLINE)) != 0) {
         Rio_writen(client_fd, buf, len);
+        if (sz + len <= MAX_OBJECT_SIZE)
+            memcpy(cache + sz, buf, len);
+        sz += len;
+    }
+    if (sz <= MAX_OBJECT_SIZE)
+        insert_into_cache(uri, cache, sz);
 }
 
 /*
@@ -194,3 +184,41 @@ void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longms
 }
 /* $end clienterror */
 
+/* Cache */
+#define BLOCK_N (MAX_CACHE_SIZE / MAX_OBJECT_SIZE)
+char cache[BLOCK_N][MAX_OBJECT_SIZE], uris[BLOCK_N][MAXLINE];
+int lens[BLOCK_N], n;
+int send_from_cache(char *uri, int client_fd) {
+    P(&mutex);
+    readcnt++;
+    if (readcnt == 1)
+        P(&w);
+    V(&mutex);
+
+    for (int i = 0; i < n; i++) {
+        if (!strcmp(uris[i], uri)) {
+            Rio_writen(client_fd, cache[i], lens[i]);
+            return 1;
+        }
+    }
+
+    P(&mutex);
+    readcnt--;
+    if (readcnt == 0)
+        V(&w);
+    V(&mutex);
+    return 0;
+}
+
+void insert_into_cache(char* uri, char* data, int len) {
+    P(&w);
+
+    int pos;
+    if (n < BLOCK_N) pos = n++;
+    else pos = len % n;
+    lens[pos] = len;
+    memcpy(cache[pos], data, len);
+    strcpy(uris[pos], uri);
+
+    V(&w);
+}
